@@ -9,7 +9,7 @@ const console = require("console");
 module.exports.userRegister = (req, res) => {
   const form = formidable();
   form.parse(req, async (err, fields, files) => {
-    console.log(fields)
+    console.log(fields);
     const { userName, email, password, confirmPassword } = fields;
 
     const { image } = files;
@@ -55,53 +55,48 @@ module.exports.userRegister = (req, res) => {
         __dirname +
         `../../../frontend/public/image/${files.image.originalFilename}`;
 
-      
-        const checkUser = await registerModel.findOne({
-          email: email,
+      const checkUser = await registerModel.findOne({
+        email: email,
+      });
+      if (checkUser) {
+        res.status(404).json({
+          error: {
+            errorMessage: ["Your email already exited"],
+          },
         });
-        if (checkUser) {
-          res.status(404).json({
-            error: {
-              errorMessage: ["Your email already exited"],
-            },
-          });
-        } else {
-          
-              const userCreate = await registerModel.create({
-                userName,
-                email,
-                password: await bcrypt.hash(password, 10),
-                image: files.image.originalFilename,
-              });
+      } else {
+        const userCreate = await registerModel.create({
+          userName,
+          email,
+          password: await bcrypt.hash(password, 10),
+          image: files.image.originalFilename,
+        });
 
+        const token = jwt.sign(
+          {
+            id: userCreate._id,
+            email: userCreate.email,
+            userName: userCreate.userName,
+            image: userCreate.image,
+            registerTime: userCreate.createdAt,
+          },
+          process.env.SECRET,
+          {
+            expiresIn: process.env.TOKEN_EXP,
+          }
+        );
 
-              const token = jwt.sign(
-                {
-                  id: userCreate._id,
-                  email: userCreate.email,
-                  userName: userCreate.userName,
-                  image: userCreate.image,
-                  registerTime: userCreate.createdAt,
-                },
-                process.env.SECRET,
-                {
-                  expiresIn: process.env.TOKEN_EXP,
-                }
-              );
+        const options = {
+          expires: new Date(
+            Date.now() + process.env.COOKIE_EXP * 24 * 60 * 60 * 1000
+          ),
+        };
 
-              const options = {
-                expires: new Date(
-                  Date.now() + process.env.COOKIE_EXP * 24 * 60 * 60 * 1000
-                ),
-              };
-
-              res.status(201).cookie("authToken", token, options).json({
-                successMessage: "Your Register Successful",
-                token,
-              });
-            
-        }
-      
+        res.status(201).cookie("authToken", token, options).json({
+          successMessage: "Your Register Successful",
+          token,
+        });
+      }
     }
   }); // end Formidable
 };
